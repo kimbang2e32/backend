@@ -1,0 +1,13 @@
+target/
+*.class
+
+# IDEs and editors
+/.idea/
+*.iml
+*.iws
+
+# Log files
+*.log
+
+# Crash logs
+clear_cache.sh

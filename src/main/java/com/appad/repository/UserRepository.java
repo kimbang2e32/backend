@@ -6,6 +6,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+import java.time.LocalDateTime;
+
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByUsername(String username);
@@ -14,4 +16,5 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     List<User> findByIsBanned(Integer isBanned);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
+    List<User> findByIsPremiumAndPremiumExpiryBefore(Integer isPremium, LocalDateTime expiryDate);
 }

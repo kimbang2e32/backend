@@ -1,5 +1,6 @@
 package com.appad.services;
 
+import com.appad.models.User;
 import com.appad.models.ArtistMembership;
 import com.appad.repository.ArtistMembershipRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,5 +63,21 @@ public class TaskSchedulerService {
                             "premium_expiring", 
                             Map.of("expiry", u.getPremiumExpiry()));
                 });
+    }
+
+    // Chạy mỗi 5 phút để tự động cập nhật trạng thái người dùng hết hạn Premium
+    @Scheduled(cron = "0 */5 * * * *")
+    public void updateExpiredPremiumUsers() {
+        System.out.println("Cron Job: Đang kiểm tra người dùng Premium hết hạn...");
+        List<User> expiredUsers = userRepository.findByIsPremiumAndPremiumExpiryBefore(1, LocalDateTime.now());
+        if (!expiredUsers.isEmpty()) {
+            for (User u : expiredUsers) {
+                u.setIsPremium(0);
+                userRepository.save(u);
+            }
+            System.out.println("Cron Job: Đã cập nhật " + expiredUsers.size() + " tài khoản Premium hết hạn về thường.");
+        } else {
+            System.out.println("Cron Job: Không có tài khoản Premium nào hết hạn cần cập nhật.");
+        }
     }
 }
