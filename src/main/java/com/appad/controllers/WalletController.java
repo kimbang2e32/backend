@@ -168,6 +168,108 @@ public class WalletController {
         return ResponseEntity.ok(Map.of("success", true, "message", "Đăng ký thành viên Premium thành công"));
     }
 
+    @GetMapping("/premium/cancel-preview")
+    public ResponseEntity<?> cancelPremiumPreview() {
+        Integer userId = getCurrentUserId();
+        User user = userRepository.findById(userId).orElseThrow();
+
+        if (user.getIsPremium() == null || user.getIsPremium() == 0 || user.getPremiumExpiry() == null 
+                || user.getPremiumExpiry().isBefore(java.time.LocalDateTime.now())) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Bạn chưa đăng ký gói Premium hoặc gói đã hết hạn"));
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime startDate = user.getPremiumExpiry().minusMonths(1);
+        
+        long secondsElapsed = java.time.Duration.between(startDate, now).getSeconds();
+        double daysElapsed = (double) secondsElapsed / (24 * 60 * 60);
+
+        double refundAmount = 0.0;
+        double refundRatio = 0.0;
+
+        if (daysElapsed >= 0 && daysElapsed <= 7.0) {
+            refundAmount = 49500.0; // Hoàn 1 nửa số tiền
+            refundRatio = 0.5;
+        }
+
+        long secondsRemaining = java.time.Duration.between(now, user.getPremiumExpiry()).getSeconds();
+        if (secondsRemaining < 0) secondsRemaining = 0;
+        long daysRemaining = (secondsRemaining + 86399) / 86400; // Làm tròn lên số ngày còn lại
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "data", Map.of(
+                "days_remaining", daysRemaining,
+                "days_elapsed", Math.round(daysElapsed * 10.0) / 10.0, // làm tròn 1 chữ số thập phân
+                "refund_ratio", refundRatio,
+                "refund_amount", refundAmount,
+                "expiry_date", user.getPremiumExpiry().toString()
+            )
+        ));
+    }
+
+    @PostMapping("/premium/cancel")
+    @Transactional
+    public ResponseEntity<?> cancelPremium() {
+        Integer userId = getCurrentUserId();
+        User user = userRepository.findById(userId).orElseThrow();
+
+        if (user.getIsPremium() == null || user.getIsPremium() == 0 || user.getPremiumExpiry() == null 
+                || user.getPremiumExpiry().isBefore(java.time.LocalDateTime.now())) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Bạn chưa đăng ký gói Premium hoặc gói đã hết hạn"));
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime startDate = user.getPremiumExpiry().minusMonths(1);
+        
+        long secondsElapsed = java.time.Duration.between(startDate, now).getSeconds();
+        double daysElapsed = (double) secondsElapsed / (24 * 60 * 60);
+
+        double refundAmount = 0.0;
+
+        if (daysElapsed >= 0 && daysElapsed <= 7.0) {
+            refundAmount = 49500.0;
+        }
+
+        long secondsRemaining = java.time.Duration.between(now, user.getPremiumExpiry()).getSeconds();
+        if (secondsRemaining < 0) secondsRemaining = 0;
+        long daysRemaining = (secondsRemaining + 86399) / 86400;
+
+        // Cập nhật ví và trạng thái Premium của user
+        user.setBalance(user.getBalance() + refundAmount);
+        user.setIsPremium(0);
+        user.setPremiumExpiry(null);
+        userRepository.save(user);
+
+        // Lưu Transaction hoàn tiền (luôn lưu vết dù 0đ hay >0đ)
+        String description = refundAmount > 0 
+                ? "Hủy gói Premium sớm trong vòng 7 ngày, hoàn lại 50% số tiền" 
+                : "Hủy gói Premium sớm sau 7 ngày sử dụng, không hoàn tiền";
+                
+        transactionRepository.save(Transaction.builder()
+                .userId(userId)
+                .type("refund")
+                .targetId(0L)
+                .amount(refundAmount)
+                .status("success")
+                .description(description)
+                .build());
+
+        // Gửi thông báo
+        String notificationMsg = refundAmount > 0 
+                ? "Bạn đã hủy gói Premium thành công. Số tiền được hoàn lại: " + refundAmount + "đ vào ví."
+                : "Bạn đã hủy gói Premium thành công. Không có tiền hoàn trả do đã quá 7 ngày sử dụng.";
+
+        notificationService.createNotification(user, 
+                "Hủy gói Premium thành công", 
+                notificationMsg,
+                "deposit", 
+                Map.of("refundAmount", refundAmount));
+
+        return ResponseEntity.ok(Map.of("success", true, "message", "Hủy gói Premium thành công", "refund_amount", refundAmount));
+    }
+
+
     @PostMapping("/purchase/song")
     @Transactional
     public ResponseEntity<?> purchaseSong(@RequestBody Map<String, Long> payload) {
