@@ -106,7 +106,7 @@ public class WalletController {
     @GetMapping("/history")
     public ResponseEntity<?> getTransactions() {
         Integer userId = getCurrentUserId();
-        return ResponseEntity.ok(Map.of("success", true, "data", transactionRepository.findByUserId(userId)));
+        return ResponseEntity.ok(Map.of("success", true, "data", transactionRepository.findByUserIdOrderByCreatedAtDesc(userId)));
     }
 
     @GetMapping("/purchased-songs")
