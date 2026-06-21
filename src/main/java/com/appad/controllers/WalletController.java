@@ -402,24 +402,35 @@ public class WalletController {
         var transactions = transactionRepository.findByUserId(userId);
         
         double totalDeposited = transactions.stream()
-                .filter(t -> "deposit".equals(t.getType()) && "completed".equals(t.getStatus()))
+                .filter(t -> "deposit".equals(t.getType()) && 
+                        ("completed".equals(t.getStatus()) || "success".equals(t.getStatus()) || "approved".equals(t.getStatus())))
                 .mapToDouble(Transaction::getAmount)
                 .sum();
                 
         double totalSpent = transactions.stream()
-                .filter(t -> ("purchase_song".equals(t.getType()) || "purchase_album".equals(t.getType())) && "completed".equals(t.getStatus()))
+                .filter(t -> ("purchase_song".equals(t.getType()) || "purchase_album".equals(t.getType())) && 
+                        ("completed".equals(t.getStatus()) || "success".equals(t.getStatus()) || "approved".equals(t.getStatus())))
                 .mapToDouble(Transaction::getAmount)
                 .sum();
 
         double totalSub = transactions.stream()
-                .filter(t -> ("premium".equals(t.getType()) || "membership".equals(t.getType())) && "completed".equals(t.getStatus()))
+                .filter(t -> ("premium".equals(t.getType()) || "membership".equals(t.getType())) && 
+                        ("completed".equals(t.getStatus()) || "success".equals(t.getStatus()) || "approved".equals(t.getStatus())))
                 .mapToDouble(Transaction::getAmount)
                 .sum();
+                
+        double totalRefund = transactions.stream()
+                .filter(t -> "refund".equals(t.getType()) && 
+                        ("completed".equals(t.getStatus()) || "success".equals(t.getStatus()) || "approved".equals(t.getStatus())))
+                .mapToDouble(Transaction::getAmount)
+                .sum();
+                
+        double netSub = Math.max(0.0, totalSub - totalRefund);
                 
         return ResponseEntity.ok(Map.of("success", true, "data", Map.of(
                 "total_deposited", totalDeposited,
                 "total_spent", totalSpent,
-                "total_subscription", totalSub
+                "total_subscription", netSub
         )));
     }
 }
