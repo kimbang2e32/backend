@@ -73,11 +73,11 @@ public class SongService {
     }
 
     public List<Song> getLatestSongs(int limit, int offset) {
-        return songRepository.findAllByStatusOrderByReleaseDateDesc(1, PageRequest.of(offset / limit, limit));
+        return songRepository.findAllByStatusOrderByReleaseDateDescSongIdDesc(1, PageRequest.of(offset / limit, limit));
     }
 
     public List<Song> getTrendingSongs(int limit, int offset) {
-        return songRepository.findAllByStatusOrderByListenCountDesc(1, PageRequest.of(offset / limit, limit));
+        return songRepository.findAllByStatusOrderByListenCountDescSongIdDesc(1, PageRequest.of(offset / limit, limit));
     }
 
     public List<Song> getPersonalFavorites(Integer userId, int limit, int offset) {
@@ -174,7 +174,7 @@ public class SongService {
         java.util.Collection<Integer> excludeParam = favoriteSongIds.isEmpty() ? java.util.List.of(-1) : favoriteSongIds;
 
         org.springframework.data.domain.Pageable pageable = PageRequest.of(offset / limit, limit, 
-                org.springframework.data.domain.Sort.by("listenCount").descending());
+                org.springframework.data.domain.Sort.by("listenCount").descending().and(org.springframework.data.domain.Sort.by("songId").descending()));
 
         return songRepository.findRecommendedSongsCustom(genresParam, artistsParam, excludeParam, 1, pageable);
     }
@@ -230,28 +230,28 @@ public class SongService {
         org.springframework.data.domain.Sort sortOrder;
         switch (sort) {
             case "oldest":
-                sortOrder = org.springframework.data.domain.Sort.by("releaseDate").ascending();
+                sortOrder = org.springframework.data.domain.Sort.by("releaseDate").ascending().and(org.springframework.data.domain.Sort.by("songId").descending());
                 break;
             case "name_asc":
-                sortOrder = org.springframework.data.domain.Sort.by("title").ascending();
+                sortOrder = org.springframework.data.domain.Sort.by("title").ascending().and(org.springframework.data.domain.Sort.by("songId").descending());
                 break;
             case "name_desc":
-                sortOrder = org.springframework.data.domain.Sort.by("title").descending();
+                sortOrder = org.springframework.data.domain.Sort.by("title").descending().and(org.springframework.data.domain.Sort.by("songId").descending());
                 break;
             case "listens_asc":
-                sortOrder = org.springframework.data.domain.Sort.by("listenCount").ascending();
+                sortOrder = org.springframework.data.domain.Sort.by("listenCount").ascending().and(org.springframework.data.domain.Sort.by("songId").descending());
                 break;
             case "listens_desc":
-                sortOrder = org.springframework.data.domain.Sort.by("listenCount").descending();
+                sortOrder = org.springframework.data.domain.Sort.by("listenCount").descending().and(org.springframework.data.domain.Sort.by("songId").descending());
                 break;
             case "rating_asc":
-                sortOrder = org.springframework.data.domain.Sort.by("averageRating").ascending();
+                sortOrder = org.springframework.data.domain.Sort.by("averageRating").ascending().and(org.springframework.data.domain.Sort.by("songId").descending());
                 break;
             case "rating_desc":
-                sortOrder = org.springframework.data.domain.Sort.by("averageRating").descending();
+                sortOrder = org.springframework.data.domain.Sort.by("averageRating").descending().and(org.springframework.data.domain.Sort.by("songId").descending());
                 break;
             default: // newest
-                sortOrder = org.springframework.data.domain.Sort.by("releaseDate").descending();
+                sortOrder = org.springframework.data.domain.Sort.by("releaseDate").descending().and(org.springframework.data.domain.Sort.by("songId").descending());
                 break;
         }
 

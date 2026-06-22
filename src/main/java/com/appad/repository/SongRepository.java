@@ -22,10 +22,10 @@ public interface SongRepository extends JpaRepository<Song, Integer> {
     List<Song> searchByTitleOrLyrics(@org.springframework.data.repository.query.Param("query") String query, @org.springframework.data.repository.query.Param("status") Integer status, org.springframework.data.domain.Pageable pageable);
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"artist", "album", "genre"})
-    List<Song> findAllByStatusOrderByReleaseDateDesc(Integer status, org.springframework.data.domain.Pageable pageable);
+    List<Song> findAllByStatusOrderByReleaseDateDescSongIdDesc(Integer status, org.springframework.data.domain.Pageable pageable);
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"artist", "album", "genre"})
-    List<Song> findAllByStatusOrderByListenCountDesc(Integer status, org.springframework.data.domain.Pageable pageable);
+    List<Song> findAllByStatusOrderByListenCountDescSongIdDesc(Integer status, org.springframework.data.domain.Pageable pageable);
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"artist", "album", "genre"})
     org.springframework.data.domain.Page<Song> findAllByStatus(Integer status, org.springframework.data.domain.Pageable pageable);
