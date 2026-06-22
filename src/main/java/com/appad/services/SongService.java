@@ -80,41 +80,103 @@ public class SongService {
         return songRepository.findAllByStatusOrderByListenCountDesc(1, PageRequest.of(offset / limit, limit));
     }
 
+    public List<Song> getPersonalFavorites(Integer userId, int limit, int offset) {
+        if (userId == null) {
+            return new java.util.ArrayList<>();
+        }
+
+        List<com.appad.models.ListeningHistory> recentHistory = 
+                listeningHistoryRepository.findTop100ByUserUserIdOrderByDayDesc(userId);
+
+        if (recentHistory.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+
+        // Gom nhóm theo bài hát và tính tổng thời gian nghe (totalDuration)
+        java.util.Map<Song, Integer> songDurationMap = recentHistory.stream()
+                .filter(h -> h.getSong() != null && h.getSong().getStatus() == 1)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        com.appad.models.ListeningHistory::getSong,
+                        java.util.stream.Collectors.summingInt(h -> h.getTotalDuration() != null ? h.getTotalDuration() : 0)
+                ));
+
+        // Sắp xếp các bài hát theo tổng thời gian nghe giảm dần
+        List<Song> sortedSongs = songDurationMap.entrySet().stream()
+                .sorted(java.util.Map.Entry.<Song, Integer>comparingByValue().reversed())
+                .map(java.util.Map.Entry::getKey)
+                .collect(java.util.stream.Collectors.toList());
+
+        int size = sortedSongs.size();
+        if (offset >= size) {
+            return new java.util.ArrayList<>();
+        }
+        int toIndex = Math.min(offset + limit, size);
+        return sortedSongs.subList(offset, toIndex);
+    }
+
     public List<Song> getRecommendedSongs(Integer userId, int limit, int offset) {
         if (userId == null) {
             return getLatestSongs(limit, offset);
         }
 
-        // 1. Get user preferences (genres from favorites and recent history)
-        var favoriteSongIds = favoriteRepository.findByUserId(userId).stream()
-                .map(com.appad.models.Favorite::getSongId)
-                .collect(java.util.stream.Collectors.toList());
-        
-        var recentHistory = listeningHistoryRepository.findByUserUserIdOrderByDayDesc(userId);
-        var recentSongIds = recentHistory.stream()
-                .limit(20)
-                .map(h -> h.getSong().getSongId())
-                .collect(java.util.stream.Collectors.toList());
-        
-        java.util.Set<Integer> preferredSongIds = new java.util.HashSet<>(favoriteSongIds);
-        preferredSongIds.addAll(recentSongIds);
+        // 1. Lấy toàn bộ lịch sử nghe nhạc gần đây để xác định nhạc tủ
+        List<com.appad.models.ListeningHistory> recentHistory = 
+                listeningHistoryRepository.findTop100ByUserUserIdOrderByDayDesc(userId);
 
-        java.util.Set<Integer> preferredGenreIds = new java.util.HashSet<>();
-        if (!preferredSongIds.isEmpty()) {
-            // Fetch the genres of these songs
-            songRepository.findAllById(preferredSongIds).forEach(s -> {
-                if (s.getGenreId() != null) preferredGenreIds.add(s.getGenreId());
-            });
+        if (recentHistory.isEmpty()) {
+            return getLatestSongs(limit, offset);
         }
 
-        if (!preferredGenreIds.isEmpty()) {
-            // 2. Query songs with matching genres, ordered by popularity
-            List<Integer> genreIds = new java.util.ArrayList<>(preferredGenreIds);
-            return songRepository.findByGenreIdInAndStatusOrderByListenCountDesc(genreIds, 1, PageRequest.of(offset / limit, limit));
+        // Gom nhóm theo bài hát và tính tổng thời gian nghe để sắp xếp nhạc tủ
+        java.util.Map<Song, Integer> songDurationMap = recentHistory.stream()
+                .filter(h -> h.getSong() != null && h.getSong().getStatus() == 1)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        com.appad.models.ListeningHistory::getSong,
+                        java.util.stream.Collectors.summingInt(h -> h.getTotalDuration() != null ? h.getTotalDuration() : 0)
+                ));
+
+        List<Song> favoriteSongs = songDurationMap.entrySet().stream()
+                .sorted(java.util.Map.Entry.<Song, Integer>comparingByValue().reversed())
+                .map(java.util.Map.Entry::getKey)
+                .collect(java.util.stream.Collectors.toList());
+
+        if (favoriteSongs.isEmpty()) {
+            return getLatestSongs(limit, offset);
         }
 
-        // Fallback: Latest songs
-        return getLatestSongs(limit, offset);
+        // 2. Lấy top 5 bài hát nghe nhiều nhất của nhạc tủ làm cơ sở
+        int topN = Math.min(5, favoriteSongs.size());
+        List<Song> topFavoriteSongs = favoriteSongs.subList(0, topN);
+
+        // 3. Lấy ra danh sách các genreId và artistId của các bài top này
+        java.util.Set<Integer> topGenreIds = topFavoriteSongs.stream()
+                .map(Song::getGenreId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+
+        java.util.Set<Integer> topArtistIds = topFavoriteSongs.stream()
+                .map(Song::getArtistId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+
+        if (topGenreIds.isEmpty() && topArtistIds.isEmpty()) {
+            return getLatestSongs(limit, offset);
+        }
+
+        // 4. Lấy tập hợp ID bài hát nhạc tủ để loại trừ
+        java.util.Set<Integer> favoriteSongIds = favoriteSongs.stream()
+                .map(Song::getSongId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        // 5. Query các bài hát tương tự (trùng genre hoặc artist), loại trừ nhạc tủ
+        java.util.Collection<Integer> genresParam = topGenreIds.isEmpty() ? java.util.List.of(-1) : topGenreIds;
+        java.util.Collection<Integer> artistsParam = topArtistIds.isEmpty() ? java.util.List.of(-1) : topArtistIds;
+        java.util.Collection<Integer> excludeParam = favoriteSongIds.isEmpty() ? java.util.List.of(-1) : favoriteSongIds;
+
+        org.springframework.data.domain.Pageable pageable = PageRequest.of(offset / limit, limit, 
+                org.springframework.data.domain.Sort.by("listenCount").descending());
+
+        return songRepository.findRecommendedSongsCustom(genresParam, artistsParam, excludeParam, 1, pageable);
     }
 
     public Optional<Song> getSongById(Integer id) {

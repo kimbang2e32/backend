@@ -69,6 +69,15 @@ public class SongController {
         return ResponseEntity.ok(Map.of("success", true, "data", songs));
     }
 
+    @GetMapping("/personal-favorites")
+    public ResponseEntity<?> getPersonalFavorites(@RequestParam(defaultValue = "20") int limit,
+                                                 @RequestParam(defaultValue = "0") int offset) {
+        Integer userId = getCurrentUserId();
+        List<Song> songs = songService.getPersonalFavorites(userId, limit, offset);
+        songService.populateAccessInfo(songs, userId);
+        return ResponseEntity.ok(Map.of("success", true, "data", songs));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<?> getById(@PathVariable Integer id) {
         return songService.getSongById(id)

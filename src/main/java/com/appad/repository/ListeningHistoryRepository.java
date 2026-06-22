@@ -23,6 +23,9 @@ public interface ListeningHistoryRepository extends JpaRepository<ListeningHisto
     
     // Get history ordered by day descending
     List<ListeningHistory> findByUserUserIdOrderByDayDesc(Integer userId);
+
+    // Get top 100 history records ordered by day descending
+    List<ListeningHistory> findTop100ByUserUserIdOrderByDayDesc(Integer userId);
     
     // For artist revenue calculation
     @Query("SELECT h FROM ListeningHistory h WHERE h.artistId = :artistId AND h.day >= :startDate")
