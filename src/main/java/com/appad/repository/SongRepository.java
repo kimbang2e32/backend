@@ -47,7 +47,7 @@ public interface SongRepository extends JpaRepository<Song, Integer> {
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"artist", "album", "genre"})
     @org.springframework.data.jpa.repository.Query("SELECT s FROM Song s WHERE s.status = :status " +
             "AND (s.genreId IN :genreIds OR s.artistId IN :artistIds) " +
-            "AND s.songId NOT IN :excludeSongIds")
+            "ORDER BY (CASE WHEN s.songId IN :excludeSongIds THEN 1 ELSE 0 END) ASC, s.listenCount DESC")
     List<Song> findRecommendedSongsCustom(
             @org.springframework.data.repository.query.Param("genreIds") java.util.Collection<Integer> genreIds,
             @org.springframework.data.repository.query.Param("artistIds") java.util.Collection<Integer> artistIds,
